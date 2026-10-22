@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industrial Predictive Maintenance Dashboard</title>
+    <script src="https://tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 border-b border-gray-800 pb-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">🏭 Factory Floor Equipment Monitor</h1>
+                <p class="text-gray-400 text-sm mt-1">Real-time Predictive Maintenance Analytics</p>
+            </div>
+            <div id="faulty-indicator" class="hidden bg-red-600 text-white px-4 py-2 rounded animate-pulse font-bold">
+                ⚠️ CRITICAL CRASH: APPLICATION FAULTY
+            </div>
+        </header>
+
+        <!-- Analytics & KPIs (Enhancement Commit) -->
+        <section class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <p class="text-gray-400 text-sm">Total Operational Machines</p>
+                <p id="kpi-active" class="text-2xl font-bold text-green-400">0</p>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <p class="text-gray-400 text-sm">Total Accumulated Downtime</p>
+                <p id="kpi-downtime" class="text-2xl font-bold text-yellow-500">0 hrs</p>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <p class="text-gray-400 text-sm">Highest Maintenance Risk</p>
+                <p id="kpi-risk" class="text-2xl font-bold text-red-400">None</p>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <p class="text-gray-400 text-sm">Active Warnings</p>
+                <p id="kpi-warnings" class="text-2xl font-bold text-red-500">0</p>
+            </div>
+        </section>
+
+        <!-- Filters (Enhancement Commit) -->
+        <section class="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-6 flex flex-wrap gap-4">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Filter by Status</label>
+                <select id="filter-status" class="bg-gray-700 text-white rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderDashboard()">
+                    <option value="All">All Statuses</option>
+                    <option value="Operational">Operational</option>
+                    <option value="Under Maintenance">Under Maintenance</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Filter by Production Unit</label>
+                <select id="filter-unit" class="bg-gray-700 text-white rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderDashboard()">
+                    <option value="All">All Units</option>
+                    <option value="Assembly A">Assembly A</option>
+                    <option value="Milling B">Milling B</option>
+                    <option value="Packaging C">Packaging C</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Machine Grid -->
+            <div class="lg:col-span-2 space-y-4" id="machine-container">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <!-- Priority & Action Table (Enhancement Commit) -->
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 h-fit">
+                <h2 class="text-xl font-bold text-yellow-400 mb-4">⚠️ High Priority Actions</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-700 text-gray-400">
+                                <th class="pb-2">Machine ID</th>
+                                <th class="pb-2">Severity</th>
+                                <th class="pb-2">Recommended Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="priority-table-body">
+                            <!-- Injected via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simulated Equipment Data
+        const machines = [
+            { id: "MC-001", unit: "Assembly A", hours: 1250, temp: 74, vibration: 4.2, status: "Operational", nextMaintenance: "2026-11-15", recentDowntime: 4 },
+            { id: "MC-002", unit: "Milling B", hours: 3200, temp: 85, vibration: 7.1, status: "Operational", nextMaintenance: "2026-10-28", recentDowntime: 12 },
+            { id: "MC-003", unit: "Assembly A", hours: 850, temp: 68, vibration: 3.1, status: "Operational", nextMaintenance: "2026-12-01", recentDowntime: 0 },
+            { id: "MC-004", unit: "Packaging C", hours: 4100, temp: 79, vibration: 8.5, status: "Under Maintenance", nextMaintenance: "2026-10-20", recentDowntime: 24 },
+            { id: "MC-005", unit: "Milling B", hours: 1980, temp: 82, vibration: 4.9, status: "Operational", nextMaintenance: "2026-11-02", recentDowntime: 8 }
+        ];
+
+        const VIBRATION_THRESHOLD = 6.0; 
+
+        // Version Control Check to simulate Faulty Rollout
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('version') === 'faulty') {
+            document.getElementById('faulty-indicator').classList.remove('hidden');
+            document.getElementById('machine-container').innerHTML = "<div class='text-red-500 font-bold p-4 bg-red-900/30 rounded border border-red-800 text-center text-xl'>Fatal Error 500: Database Connection Interrupted.</div>";
+            throw new Error("Application Interrupted: Faulty Deployment Triggered.");
+        }
+
+        function renderDashboard() {
+            const statusFilter = document.getElementById('filter-status').value;
+            const unitFilter = document.getElementById('filter-unit').value;
+            
+            let filtered = machines.filter(m => {
+                return (statusFilter === "All" || m.status === statusFilter) &&
+                       (unitFilter === "All" || m.unit === unitFilter);
+            });
+
+            // Calculate Analytics KPIs
+            let operationalCount = machines.filter(m => m.status === "Operational").length;
+            let totalDowntime = machines.reduce((acc, m) => acc + m.recentDowntime, 0);
+            let activeWarnings = machines.filter(m => m.temp > 80 || m.vibration > VIBRATION_THRESHOLD).length;
+            
+            // Calculate Highest Maintenance Risk (High Vibe + High Temp = Max Risk score)
+            let highestRiskMachine = machines.reduce((prev, current) => {
+                let prevRisk = prev.temp + (prev.vibration * 10);
+                let currRisk = current.temp + (current.vibration * 10);
+                return (currRisk > prevRisk) ? current : prev;
+            });
+
+            document.getElementById('kpi-active').innerText = operationalCount;
+            document.getElementById('kpi-downtime').innerText = totalDowntime + " hrs";
+            document.getElementById('kpi-risk').innerText = highestRiskMachine.id;
+            document.getElementById('kpi-warnings').innerText = activeWarnings;
+
+            // Generate Machine Grid UI
+            let container = document.getElementById('machine-container');
+            container.innerHTML = "";
+            
+            let priorityRows = "";
+
+            filtered.forEach(m => {
+                let hasTempWarning = m.temp > 80;
+                let hasVibeWarning = m.vibration > VIBRATION_THRESHOLD;
+                let isCritical = hasTempWarning || hasVibeWarning;
+
+                // Build action recommendations
+                if (isCritical) {
+                    let severity = hasTempWarning && hasVibeWarning ? "CRITICAL" : "HIGH";
+                    let action = hasTempWarning ? "Calibrate cooling systems immediately." : "Inspect bearings & dampeners.";
+                    priorityRows += `
+                        <tr class="border-b border-gray-700/50 text-gray-300">
+                            <td class="py-3 font-semibold text-red-400">${m.id}</td>
+                            <td class="py-3"><span class="px-2 py-0.5 rounded text-xs font-bold ${severity === 'CRITICAL' ? 'bg-red-600 text-white':'bg-amber-600 text-white'}">${severity}</span></td>
+                            <td class="py-3 text-xs">${action}</td>
+                        </tr>`;
+                }
+
+                container.innerHTML += `
+                    <div class="bg-gray-800 p-5 rounded-lg border ${isCritical ? 'border-red-500 animate-pulse':'border-gray-700'} flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-xs uppercase px-2 py-1 bg-gray-700 text-gray-300 rounded font-semibold">${m.unit}</span>
+                                <h3 class="text-xl font-bold mt-2 text-white">${m.id}</h3>
+                            </div>
+                            <span class="px-2 py-1 text-xs rounded font-bold ${m.status === 'Operational' ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'}">
+                                ${m.status}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 my-4 text-sm">
+                            <div>
